@@ -1,0 +1,22 @@
+[project]
+name = "fft-bench"
+version = "0.1.0"
+description = "Benchmarking tool for FFT libraries in Python"
+readme = "README.md"
+authors = [
+    { name = "stebix", email = "jannik.stebani@physik.uni-wuerzburg.de" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.2",
+    "pyfftw>=0.15.1",
+    "scipy>=1.17.0",
+]
+
+[project.scripts]
+fft-bench = "fft_bench:main"
+
+[build-system]
+requires = ["uv_build>=0.9.29,<0.10.0"]
+build-backend = "uv_build"
