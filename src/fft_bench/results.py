@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import SingleBenchmarkConfig
+from .fileutil import OverwritePolicy, resolve_output_path
 from .hardware import HardwareInfo
 
 _VERSION = "0.1.0"
@@ -153,18 +154,31 @@ class BenchmarkSuite:
             version=data.get("version", "unknown"),
         )
 
-    def save(self, path: str | Path) -> None:
+    def save(
+        self,
+        path: str | Path,
+        overwrite_policy: OverwritePolicy = OverwritePolicy.AUTO_RENAME,
+    ) -> Path:
         """Save the suite to a JSON file.
 
         Parameters
         ----------
         path : str | Path
             Output file path.
+        overwrite_policy : OverwritePolicy
+            How to handle an already-existing file.
+
+        Returns
+        -------
+        Path
+            The actual path written to (may differ under ``AUTO_RENAME``).
         """
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
+        path = resolve_output_path(path, overwrite_policy)
         with open(path, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
+        return path
 
     @classmethod
     def load(cls, path: str | Path) -> BenchmarkSuite:

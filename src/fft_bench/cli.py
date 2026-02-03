@@ -8,6 +8,7 @@ import sys
 
 from . import backends
 from .config import expand_parameter_grid
+from .fileutil import OverwritePolicy
 from .results import BenchmarkSuite
 from .runner import run_benchmarks
 
@@ -84,6 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="results.json",
         help="Output JSON file path (default: results.json)",
     )
+    _add_overwrite_args(run_parser)
 
     # --- plot subcommand ---
     plot_parser = subparsers.add_parser(
@@ -110,8 +112,50 @@ def build_parser() -> argparse.ArgumentParser:
         default=150,
         help="DPI for raster formats (default: 150)",
     )
+    _add_overwrite_args(plot_parser)
 
     return parser
+
+
+def _add_overwrite_args(parser: argparse.ArgumentParser) -> None:
+    """Add ``--overwrite-policy`` and ``-f/--force`` to a subparser.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        The subparser to augment.
+    """
+    parser.add_argument(
+        "--overwrite-policy",
+        choices=["auto-rename", "force", "error"],
+        default="auto-rename",
+        help="Policy when output file exists (default: auto-rename)",
+    )
+    parser.add_argument(
+        "-f", "--force",
+        action="store_true",
+        default=False,
+        help="Shorthand for --overwrite-policy force",
+    )
+
+
+def _resolve_overwrite_policy(args: argparse.Namespace) -> OverwritePolicy:
+    """Derive the effective overwrite policy from parsed CLI arguments.
+
+    ``--force`` takes priority over ``--overwrite-policy``.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments.
+
+    Returns
+    -------
+    OverwritePolicy
+    """
+    if args.force:
+        return OverwritePolicy.FORCE
+    return OverwritePolicy(args.overwrite_policy)
 
 
 def cmd_run(args: argparse.Namespace) -> None:
@@ -151,8 +195,9 @@ def cmd_run(args: argparse.Namespace) -> None:
     print(f"Running {len(configs)} benchmark configurations...")
     suite = run_benchmarks(configs, progress=True)
 
-    suite.save(args.output)
-    print(f"\nResults saved to {args.output}")
+    policy = _resolve_overwrite_policy(args)
+    actual_path = suite.save(args.output, overwrite_policy=policy)
+    print(f"\nResults saved to {actual_path}")
 
     # Summary
     successful = sum(1 for r in suite.results if r.success)
@@ -173,11 +218,13 @@ def cmd_plot(args: argparse.Namespace) -> None:
     suite = BenchmarkSuite.load(args.input)
     print(f"Loaded {len(suite.results)} results from {args.input}")
 
+    policy = _resolve_overwrite_policy(args)
     generate_all_plots(
         suite=suite,
         output_dir=args.output,
         fmt=args.format,
         dpi=args.dpi,
+        overwrite_policy=policy,
     )
 
 

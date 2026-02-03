@@ -9,6 +9,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .fileutil import OverwritePolicy, resolve_output_path
 from .results import BenchmarkResult, BenchmarkSuite
 
 
@@ -17,6 +18,7 @@ def generate_all_plots(
     output_dir: str | Path,
     fmt: str = "png",
     dpi: int = 150,
+    overwrite_policy: OverwritePolicy = OverwritePolicy.AUTO_RENAME,
 ) -> None:
     """Generate all plot types from a benchmark suite.
 
@@ -30,6 +32,8 @@ def generate_all_plots(
         Image format ('png', 'pdf', 'svg').
     dpi : int
         DPI for raster formats.
+    overwrite_policy : OverwritePolicy
+        How to handle already-existing plot files.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -39,10 +43,10 @@ def generate_all_plots(
         print("No successful results to plot.")
         return
 
-    plot_runtime_vs_size(successful, output_dir, fmt, dpi)
-    plot_backend_comparison(successful, output_dir, fmt, dpi)
-    plot_threading_scaling(successful, output_dir, fmt, dpi)
-    plot_dtype_impact(successful, output_dir, fmt, dpi)
+    plot_runtime_vs_size(successful, output_dir, fmt, dpi, overwrite_policy)
+    plot_backend_comparison(successful, output_dir, fmt, dpi, overwrite_policy)
+    plot_threading_scaling(successful, output_dir, fmt, dpi, overwrite_policy)
+    plot_dtype_impact(successful, output_dir, fmt, dpi, overwrite_policy)
 
     print(f"Plots saved to {output_dir}/")
 
@@ -53,6 +57,7 @@ def _save_fig(
     name: str,
     fmt: str,
     dpi: int,
+    overwrite_policy: OverwritePolicy = OverwritePolicy.AUTO_RENAME,
 ) -> None:
     """Save a figure and close it.
 
@@ -68,8 +73,11 @@ def _save_fig(
         Image format.
     dpi : int
         DPI for raster formats.
+    overwrite_policy : OverwritePolicy
+        How to handle an already-existing file.
     """
     path = output_dir / f"{name}.{fmt}"
+    path = resolve_output_path(path, overwrite_policy)
     fig.savefig(path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved {path}")
@@ -80,6 +88,7 @@ def plot_runtime_vs_size(
     output_dir: Path,
     fmt: str,
     dpi: int,
+    overwrite_policy: OverwritePolicy = OverwritePolicy.AUTO_RENAME,
 ) -> None:
     """Plot runtime vs FFT size, per ndim.
 
@@ -96,6 +105,8 @@ def plot_runtime_vs_size(
         Image format.
     dpi : int
         DPI for raster formats.
+    overwrite_policy : OverwritePolicy
+        How to handle already-existing plot files.
     """
     # Group by ndim
     by_ndim: dict[int, list[BenchmarkResult]] = defaultdict(list)
@@ -140,7 +151,7 @@ def plot_runtime_vs_size(
         ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3)
 
-        _save_fig(fig, output_dir, f"runtime_vs_size_{ndim}d", fmt, dpi)
+        _save_fig(fig, output_dir, f"runtime_vs_size_{ndim}d", fmt, dpi, overwrite_policy)
 
 
 def plot_backend_comparison(
@@ -148,6 +159,7 @@ def plot_backend_comparison(
     output_dir: Path,
     fmt: str,
     dpi: int,
+    overwrite_policy: OverwritePolicy = OverwritePolicy.AUTO_RENAME,
 ) -> None:
     """Plot grouped bar chart comparing backends.
 
@@ -163,6 +175,8 @@ def plot_backend_comparison(
         Image format.
     dpi : int
         DPI for raster formats.
+    overwrite_policy : OverwritePolicy
+        How to handle already-existing plot files.
     """
     # Group by (ndim, dtype)
     groups: dict[tuple[int, str], list[BenchmarkResult]] = defaultdict(list)
@@ -216,6 +230,7 @@ def plot_backend_comparison(
         _save_fig(
             fig, output_dir,
             f"backend_comparison_{ndim}d_{dtype}", fmt, dpi,
+            overwrite_policy,
         )
 
 
@@ -224,6 +239,7 @@ def plot_threading_scaling(
     output_dir: Path,
     fmt: str,
     dpi: int,
+    overwrite_policy: OverwritePolicy = OverwritePolicy.AUTO_RENAME,
 ) -> None:
     """Plot threading scaling for backends that support it.
 
@@ -239,6 +255,8 @@ def plot_threading_scaling(
         Image format.
     dpi : int
         DPI for raster formats.
+    overwrite_policy : OverwritePolicy
+        How to handle already-existing plot files.
     """
     # Only include results where threads > 1 exists for that backend
     thread_counts: dict[str, set[int]] = defaultdict(set)
@@ -296,6 +314,7 @@ def plot_threading_scaling(
         _save_fig(
             fig, output_dir,
             f"threading_{backend}_{ndim}d_{dtype}", fmt, dpi,
+            overwrite_policy,
         )
 
 
@@ -304,6 +323,7 @@ def plot_dtype_impact(
     output_dir: Path,
     fmt: str,
     dpi: int,
+    overwrite_policy: OverwritePolicy = OverwritePolicy.AUTO_RENAME,
 ) -> None:
     """Plot dtype impact on runtime.
 
@@ -319,6 +339,8 @@ def plot_dtype_impact(
         Image format.
     dpi : int
         DPI for raster formats.
+    overwrite_policy : OverwritePolicy
+        How to handle already-existing plot files.
     """
     # Group by (backend, ndim)
     groups: dict[tuple[str, int], list[BenchmarkResult]] = defaultdict(list)
@@ -366,6 +388,7 @@ def plot_dtype_impact(
         _save_fig(
             fig, output_dir,
             f"dtype_impact_{backend}_{ndim}d", fmt, dpi,
+            overwrite_policy,
         )
 
 
