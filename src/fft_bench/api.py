@@ -18,7 +18,7 @@ def run(
     threads: Sequence[int] | None = None,
     warmup: int = 3,
     repetitions: int = 10,
-    progress: bool = True,
+    progress: bool | str = "auto",
 ) -> BenchmarkSuite:
     """Run FFT benchmarks and return results as a :class:`BenchmarkSuite`.
 
@@ -42,8 +42,10 @@ def run(
         Number of warmup iterations before timing.
     repetitions : int
         Number of timed repetitions.
-    progress : bool
-        Whether to print progress information to stdout.
+    progress : bool | str
+        Progress display mode. ``True`` maps to ``"auto"``, ``False`` to
+        ``"silent"``. String values: ``"auto"``, ``"bar"``, ``"plain"``,
+        ``"silent"``.
 
     Returns
     -------

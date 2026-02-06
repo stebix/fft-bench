@@ -85,6 +85,18 @@ def build_parser() -> argparse.ArgumentParser:
         default="results.json",
         help="Output JSON file path (default: results.json)",
     )
+    run_parser.add_argument(
+        "--progress",
+        choices=["auto", "bar", "plain", "silent"],
+        default="auto",
+        help="Progress display mode (default: auto)",
+    )
+    run_parser.add_argument(
+        "-q", "--quiet",
+        action="store_true",
+        default=False,
+        help="Shorthand for --progress silent",
+    )
     _add_overwrite_args(run_parser)
 
     # --- plot subcommand ---
@@ -192,8 +204,10 @@ def cmd_run(args: argparse.Namespace) -> None:
         print("No valid configurations after filtering. Nothing to run.")
         sys.exit(1)
 
+    progress_mode = "silent" if args.quiet else args.progress
+
     print(f"Running {len(configs)} benchmark configurations...")
-    suite = run_benchmarks(configs, progress=True)
+    suite = run_benchmarks(configs, progress=progress_mode)
 
     policy = _resolve_overwrite_policy(args)
     actual_path = suite.save(args.output, overwrite_policy=policy)

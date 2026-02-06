@@ -7,6 +7,7 @@ import logging
 from . import backends
 from .config import SingleBenchmarkConfig
 from .hardware import capture_hardware_info
+from .progress import progress_context, resolve_progress_mode
 from .results import BenchmarkResult, BenchmarkSuite
 from .timing import benchmark_single
 
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def run_benchmarks(
     configs: list[SingleBenchmarkConfig],
-    progress: bool = True,
+    progress: bool | str = "auto",
 ) -> BenchmarkSuite:
     """Run all benchmark configurations and collect results.
 
@@ -26,35 +27,26 @@ def run_benchmarks(
     ----------
     configs : list[SingleBenchmarkConfig]
         List of benchmark configurations to run.
-    progress : bool
-        Whether to print progress information.
+    progress : bool | str
+        Progress display mode. ``True`` maps to ``"auto"``, ``False`` to
+        ``"silent"``. String values: ``"auto"``, ``"bar"``, ``"plain"``,
+        ``"silent"``.
 
     Returns
     -------
     BenchmarkSuite
         Complete suite with all results and hardware info.
     """
+    mode = resolve_progress_mode(progress)
     hardware = capture_hardware_info()
     results: list[BenchmarkResult] = []
-    total = len(configs)
 
-    for i, config in enumerate(configs, 1):
-        label = (
-            f"[{i}/{total}] {config.backend} "
-            f"shape={config.shape} dtype={config.dtype} "
-            f"threads={config.threads}"
-        )
-        if progress:
-            print(f"  {label} ...", end="", flush=True)
-
-        result = _run_single(config)
-        results.append(result)
-
-        if progress:
-            if result.success:
-                print(f" {result.mean:.6f}s (mean)")
-            else:
-                print(f" FAILED: {result.error}")
+    with progress_context(configs, mode) as reporter:
+        for i, config in enumerate(configs, 1):
+            reporter.on_start(i, config)
+            result = _run_single(config)
+            results.append(result)
+            reporter.on_finish(i, config, result)
 
     return BenchmarkSuite(results=results, hardware=hardware)
 
