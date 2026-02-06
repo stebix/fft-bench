@@ -1,6 +1,10 @@
 # project specific excludes
 **/nukeme/**
 
+# Claude specific stuff
+.claude/
+CLAUDE.*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
