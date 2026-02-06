@@ -67,20 +67,29 @@ def _run_single(config: SingleBenchmarkConfig) -> BenchmarkResult:
         backend_cls = backends.get(config.backend)
         backend = backend_cls()
 
-        backend.setup(
-            shape=config.shape,
-            dtype=config.dtype,
-            threads=config.threads,
-        )
-
-        try:
-            timings = benchmark_single(
-                execute_fn=backend.execute,
+        if hasattr(backend, "run_timed"):
+            timings = backend.run_timed(
+                shape=config.shape,
+                dtype=config.dtype,
+                threads=config.threads,
                 warmup=config.warmup,
                 repetitions=config.repetitions,
             )
-        finally:
-            backend.teardown()
+        else:
+            backend.setup(
+                shape=config.shape,
+                dtype=config.dtype,
+                threads=config.threads,
+            )
+
+            try:
+                timings = benchmark_single(
+                    execute_fn=backend.execute,
+                    warmup=config.warmup,
+                    repetitions=config.repetitions,
+                )
+            finally:
+                backend.teardown()
 
         return BenchmarkResult(
             config=config,

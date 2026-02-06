@@ -19,6 +19,7 @@ _BACKEND_MODULES = [
     "fft_bench.backends.scipy_",
     "fft_bench.backends.pyfftw_",
     "fft_bench.backends.cupy_",
+    "fft_bench.backends.cufft_native",
 ]
 
 

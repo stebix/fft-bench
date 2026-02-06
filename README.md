@@ -4,11 +4,25 @@ A benchmarking tool for comparing FFT (Fast Fourier Transform) libraries availab
 
 ## Supported Backends
 
+### Python backends
+
 | Backend | Threading | Notes |
 |---------|-----------|-------|
 | NumPy   | No        | Uses `numpy.fft` |
 | SciPy   | Yes       | Uses `scipy.fft` with `workers` parameter |
 | pyFFTW  | Yes       | Pre-planned FFTW via `pyfftw.builders`; planning cost excluded from timing |
+| CuPy    | No        | GPU-accelerated via cuFFT; timed from Python with device synchronization |
+
+### Native backends
+
+These backends invoke an external `cufft-bench` binary that performs its own timing using CUDA events, providing sub-microsecond GPU-side resolution without Python overhead.
+
+| Backend   | Mode   | Notes |
+|-----------|--------|-------|
+| `cufft`     | kernel | Times only the `cufftExec*` call (pure FFT compute) |
+| `cufft-e2e` | e2e    | Times the full cycle: memory allocation, host-to-device copy, FFT, device-to-host copy, deallocation |
+
+Native backends are **self-timed** — they bypass fft-bench's `time.perf_counter()` loop and return per-iteration timings directly from CUDA events. They are automatically discovered and registered when the `cufft-bench` binary is available (see [Native Backend Setup](#native-backend-setup) below).
 
 ## Installation
 
@@ -17,6 +31,18 @@ Requires Python 3.12+. Managed with [uv](https://docs.astral.sh/uv/):
 ```bash
 uv sync
 ```
+
+### Native Backend Setup
+
+The native cuFFT backends require the `cufft-bench` binary, which is built separately from the [cufft-bench](https://github.com/your-org/cufft-bench) companion project. fft-bench locates the binary in two ways:
+
+1. **Environment variable** — set `CUFFT_BENCH_PATH` to the absolute path of the binary:
+   ```bash
+   export CUFFT_BENCH_PATH=/path/to/cufft-bench/build/cufft-bench
+   ```
+2. **PATH lookup** — if the variable is not set, fft-bench falls back to `shutil.which("cufft-bench")`, so placing the binary on your `PATH` also works.
+
+If neither method finds the binary, the `cufft` and `cufft-e2e` backends are silently skipped and won't appear in the available backends list.
 
 ## Usage
 
@@ -39,13 +65,18 @@ fft-bench run --backends numpy scipy pyfftw \
               --threads 1 2 4 \
               --warmup 5 --repetitions 20 \
               -o results.json
+
+# Run native cuFFT backends alongside Python backends
+CUFFT_BENCH_PATH=/path/to/cufft-bench/build/cufft-bench \
+  fft-bench run --backends numpy scipy cufft cufft-e2e \
+                --sizes 256 512 1024 --ndims 1 2 --dtypes float32
 ```
 
 **Key options:**
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--backends` | all available | Backends to benchmark |
+| `--backends` | all available | Backends to benchmark (`numpy`, `scipy`, `pyfftw`, `cupy`, `cufft`, `cufft-e2e`) |
 | `--sizes` | `64 128 256 512 1024` | FFT sizes along each dimension |
 | `--ndims` | `1` | Number of dimensions (1, 2, or 3) |
 | `--dtypes` | `float64 complex128` | Data types (`float32`, `float64`, `complex64`, `complex128`) |
@@ -106,6 +137,13 @@ suite = fft_bench.run(
     dtypes=["float64", "complex128"],
 )
 
+# Native backends work identically (requires CUFFT_BENCH_PATH or binary on PATH)
+suite = fft_bench.run(
+    backends=["numpy", "cufft", "cufft-e2e"],
+    sizes=[256, 512, 1024],
+    dtypes=["float32"],
+)
+
 suite.run_id   # "brave-calm-otter"
 suite.hardware.cpu_model  # "AMD EPYC 7452 32-Core Processor"
 ```
@@ -144,3 +182,5 @@ Results are saved as JSON containing hardware info, library versions, and per-co
 ## Adding a New Backend
 
 Create a file in `src/fft_bench/backends/` implementing the `Backend` protocol (the `setup`/`execute`/`teardown` lifecycle) and register it. No other changes are required.
+
+For backends that perform their own timing (e.g. wrapping an external binary), implement a `run_timed(shape, dtype, threads, warmup, repetitions) -> list[float]` method instead. The runner detects this via duck typing and calls it directly, bypassing the standard three-phase cycle. Timings must be returned in seconds.

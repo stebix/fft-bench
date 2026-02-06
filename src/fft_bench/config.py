@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .backends.base import BackendCapabilities
 
+from .backends.base import BackendKind
 from .hardware import cuda_is_available
 
 logger = logging.getLogger(__name__)
@@ -136,8 +137,10 @@ def expand_parameter_grid(
     has_cuda = cuda_is_available()
 
     for backend_name, caps in backends.items():
-        # Skip CUDA backends when no GPU is available
-        if caps.device == "cuda" and not has_cuda:
+        # Skip CUDA backends when no GPU is available (native backends
+        # verify availability at registration time, so they don't need
+        # the CuPy-based CUDA check)
+        if caps.device == "cuda" and caps.kind != BackendKind.NATIVE and not has_cuda:
             logger.warning(
                 "Skipping %s (requires CUDA but no GPU available)",
                 backend_name,

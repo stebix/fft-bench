@@ -8,3 +8,8 @@ graphs.
 
 - use numpy-style docstrings
 - this project is generally managed with `uv`
+
+## external binaries
+
+We implemented CUDA and C++ native binaries in `/home/jannik/storage/code/cufft-bench` with a README
+that are aimed at providing native timings.
