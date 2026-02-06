@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -96,10 +97,10 @@ class SingleBenchmarkConfig:
 
 def expand_parameter_grid(
     backends: dict[str, BackendCapabilities],
-    sizes: list[int],
-    ndims: list[int],
-    dtypes: list[str],
-    threads: list[int],
+    sizes: Sequence[int],
+    ndims: Sequence[int],
+    dtypes: Sequence[str],
+    threads: Sequence[int],
     warmup: int,
     repetitions: int,
 ) -> list[SingleBenchmarkConfig]:
@@ -113,13 +114,13 @@ def expand_parameter_grid(
     ----------
     backends : dict[str, BackendCapabilities]
         Mapping of backend name to its capabilities.
-    sizes : list[int]
+    sizes : Sequence[int]
         FFT sizes along each dimension.
-    ndims : list[int]
+    ndims : Sequence[int]
         Number of dimensions to benchmark.
-    dtypes : list[str]
+    dtypes : Sequence[str]
         Data type strings to benchmark.
-    threads : list[int]
+    threads : Sequence[int]
         Thread counts to benchmark.
     warmup : int
         Number of warmup iterations.
