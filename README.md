@@ -34,7 +34,7 @@ uv sync
 
 ### Native Backend Setup
 
-The native cuFFT backends require the `cufft-bench` binary, which is built separately from the [cufft-bench](https://github.com/your-org/cufft-bench) companion project. fft-bench locates the binary in two ways:
+The native cuFFT backends require the `cufft-bench` binary, which is built separately from the [cufft-bench](https://github.com/stebix/cufft-bench) companion project. fft-bench locates the binary in two ways:
 
 1. **Environment variable** — set `CUFFT_BENCH_PATH` to the absolute path of the binary:
    ```bash
