@@ -16,10 +16,13 @@ class BackendKind(Enum):
         Pure Python backend (timing via perf_counter).
     NATIVE : str
         Native backend (may use subprocess, timing may be internal).
+    CUDA : str
+        CUDA-accelerated backend (requires GPU, execute must synchronize).
     """
 
     PYTHON = "python"
     NATIVE = "native"
+    CUDA = "cuda"
 
 
 @dataclass(frozen=True)
@@ -35,7 +38,9 @@ class BackendCapabilities:
     max_ndim : int
         Maximum number of dimensions supported.
     kind : BackendKind
-        Whether this is a Python or native backend.
+        Whether this is a Python, native, or CUDA backend.
+    device : str
+        Target device for computation ('cpu' or 'cuda').
     """
 
     supported_dtypes: frozenset[str] = field(
@@ -46,6 +51,7 @@ class BackendCapabilities:
     supports_threading: bool = False
     max_ndim: int = 3
     kind: BackendKind = BackendKind.PYTHON
+    device: str = "cpu"
 
 
 @runtime_checkable

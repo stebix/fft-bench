@@ -10,6 +10,57 @@ from pathlib import Path
 
 
 @dataclass
+class GpuInfo:
+    """Information about a single GPU device.
+
+    Parameters
+    ----------
+    name : str
+        GPU device name.
+    memory_total_gb : float
+        Total GPU memory in gigabytes.
+    driver_version : str
+        GPU driver version string.
+    cuda_version : str
+        CUDA runtime version string.
+    """
+
+    name: str
+    memory_total_gb: float
+    driver_version: str
+    cuda_version: str
+
+    def to_dict(self) -> dict:
+        """Serialize to a JSON-compatible dictionary."""
+        return {
+            "name": self.name,
+            "memory_total_gb": self.memory_total_gb,
+            "driver_version": self.driver_version,
+            "cuda_version": self.cuda_version,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> GpuInfo:
+        """Deserialize from a dictionary.
+
+        Parameters
+        ----------
+        data : dict
+            Dictionary with GPU info fields.
+
+        Returns
+        -------
+        GpuInfo
+        """
+        return cls(
+            name=data["name"],
+            memory_total_gb=data["memory_total_gb"],
+            driver_version=data["driver_version"],
+            cuda_version=data["cuda_version"],
+        )
+
+
+@dataclass
 class HardwareInfo:
     """Snapshot of the hardware and software environment.
 
@@ -29,6 +80,8 @@ class HardwareInfo:
         Python version string.
     library_versions : dict[str, str]
         Versions of relevant libraries.
+    gpu_devices : list[GpuInfo]
+        List of available GPU devices.
     """
 
     cpu_model: str
@@ -38,6 +91,7 @@ class HardwareInfo:
     os_name: str
     python_version: str
     library_versions: dict[str, str] = field(default_factory=dict)
+    gpu_devices: list[GpuInfo] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Serialize to a JSON-compatible dictionary."""
@@ -49,6 +103,7 @@ class HardwareInfo:
             "os_name": self.os_name,
             "python_version": self.python_version,
             "library_versions": self.library_versions,
+            "gpu_devices": [g.to_dict() for g in self.gpu_devices],
         }
 
     @classmethod
@@ -72,6 +127,9 @@ class HardwareInfo:
             os_name=data["os_name"],
             python_version=data["python_version"],
             library_versions=data.get("library_versions", {}),
+            gpu_devices=[
+                GpuInfo.from_dict(g) for g in data.get("gpu_devices", [])
+            ],
         )
 
 
@@ -125,7 +183,75 @@ def _get_library_versions() -> dict[str, str]:
     except ImportError:
         pass
 
+    try:
+        import cupy
+        versions["cupy"] = cupy.__version__
+    except ImportError:
+        pass
+
     return versions
+
+
+def _get_gpu_devices() -> list[GpuInfo]:
+    """Detect available CUDA GPU devices via CuPy.
+
+    Returns
+    -------
+    list[GpuInfo]
+        Information for each detected GPU, empty if no CUDA available.
+    """
+    try:
+        import cupy
+    except ImportError:
+        return []
+
+    devices: list[GpuInfo] = []
+    try:
+        device_count = cupy.cuda.runtime.getDeviceCount()
+    except cupy.cuda.runtime.CUDARuntimeError:
+        return []
+
+    cuda_version_int = cupy.cuda.runtime.runtimeGetVersion()
+    cuda_major = cuda_version_int // 1000
+    cuda_minor = (cuda_version_int % 1000) // 10
+    cuda_version = f"{cuda_major}.{cuda_minor}"
+
+    driver_version_int = cupy.cuda.runtime.driverGetVersion()
+    driver_major = driver_version_int // 1000
+    driver_minor = (driver_version_int % 1000) // 10
+    driver_version = f"{driver_major}.{driver_minor}"
+
+    for i in range(device_count):
+        with cupy.cuda.Device(i):
+            props = cupy.cuda.runtime.getDeviceProperties(i)
+            name = props["name"].decode() if isinstance(props["name"], bytes) else props["name"]
+            mem_bytes = props["totalGlobalMem"]
+            mem_gb = round(mem_bytes / (1024**3), 2)
+            devices.append(
+                GpuInfo(
+                    name=name,
+                    memory_total_gb=mem_gb,
+                    driver_version=driver_version,
+                    cuda_version=cuda_version,
+                )
+            )
+
+    return devices
+
+
+def cuda_is_available() -> bool:
+    """Check whether CUDA is available on this system.
+
+    Returns
+    -------
+    bool
+        ``True`` if at least one CUDA device is detected.
+    """
+    try:
+        import cupy
+        return cupy.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        return False
 
 
 def capture_hardware_info() -> HardwareInfo:
@@ -144,4 +270,5 @@ def capture_hardware_info() -> HardwareInfo:
         os_name=f"{platform.system()} {platform.release()}",
         python_version=sys.version,
         library_versions=_get_library_versions(),
+        gpu_devices=_get_gpu_devices(),
     )

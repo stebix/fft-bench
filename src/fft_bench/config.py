@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .backends.base import BackendCapabilities
 
+from .hardware import cuda_is_available
+
 logger = logging.getLogger(__name__)
 
 # Mapping from user-facing dtype strings to numpy dtype strings
@@ -130,8 +132,17 @@ def expand_parameter_grid(
         List of valid benchmark configurations.
     """
     configs: list[SingleBenchmarkConfig] = []
+    has_cuda = cuda_is_available()
 
     for backend_name, caps in backends.items():
+        # Skip CUDA backends when no GPU is available
+        if caps.device == "cuda" and not has_cuda:
+            logger.warning(
+                "Skipping %s (requires CUDA but no GPU available)",
+                backend_name,
+            )
+            continue
+
         for size, ndim, dtype, nthreads in itertools.product(
             sizes, ndims, dtypes, threads
         ):

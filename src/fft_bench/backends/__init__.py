@@ -18,6 +18,7 @@ _BACKEND_MODULES = [
     "fft_bench.backends.numpy_",
     "fft_bench.backends.scipy_",
     "fft_bench.backends.pyfftw_",
+    "fft_bench.backends.cupy_",
 ]
 
 
