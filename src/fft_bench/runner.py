@@ -27,9 +27,9 @@ def _try_gpu_cleanup() -> None:
     try:
         import cupy as cp
 
+        cp.fft.config.get_plan_cache().clear()
         cp.get_default_memory_pool().free_all_blocks()
         cp.get_default_pinned_memory_pool().free_all_blocks()
-        cp.fft.config.get_plan_cache().clear()
     except Exception:
         pass
 
