@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import gc
 import logging
+import sys
 
 from . import backends
 from .config import SingleBenchmarkConfig
@@ -12,6 +14,24 @@ from .results import BenchmarkResult, BenchmarkSuite
 from .timing import benchmark_single
 
 logger = logging.getLogger(__name__)
+
+
+def _try_gpu_cleanup() -> None:
+    """Best-effort GPU memory cleanup.
+
+    Frees CuPy memory pools and plan caches. Only runs when CuPy is
+    already imported. Safe to call at any time -- never raises.
+    """
+    if "cupy" not in sys.modules:
+        return
+    try:
+        import cupy as cp
+
+        cp.get_default_memory_pool().free_all_blocks()
+        cp.get_default_pinned_memory_pool().free_all_blocks()
+        cp.fft.config.get_plan_cache().clear()
+    except Exception:
+        pass
 
 
 def run_benchmarks(
@@ -47,6 +67,8 @@ def run_benchmarks(
             result = _run_single(config)
             results.append(result)
             reporter.on_finish(i, config, result)
+            gc.collect()
+            _try_gpu_cleanup()
 
     return BenchmarkSuite(results=results, hardware=hardware)
 
@@ -76,20 +98,22 @@ def _run_single(config: SingleBenchmarkConfig) -> BenchmarkResult:
                 repetitions=config.repetitions,
             )
         else:
-            backend.setup(
-                shape=config.shape,
-                dtype=config.dtype,
-                threads=config.threads,
-            )
-
             try:
+                backend.setup(
+                    shape=config.shape,
+                    dtype=config.dtype,
+                    threads=config.threads,
+                )
                 timings = benchmark_single(
                     execute_fn=backend.execute,
                     warmup=config.warmup,
                     repetitions=config.repetitions,
                 )
             finally:
-                backend.teardown()
+                try:
+                    backend.teardown()
+                except Exception:
+                    logger.debug("Backend teardown failed", exc_info=True)
 
         return BenchmarkResult(
             config=config,
@@ -98,6 +122,8 @@ def _run_single(config: SingleBenchmarkConfig) -> BenchmarkResult:
         )
 
     except MemoryError:
+        gc.collect()
+        _try_gpu_cleanup()
         logger.error(
             "MemoryError for %s shape=%s dtype=%s",
             config.backend, config.shape, config.dtype,
@@ -109,6 +135,8 @@ def _run_single(config: SingleBenchmarkConfig) -> BenchmarkResult:
             error="MemoryError: insufficient memory for this configuration",
         )
     except Exception as e:
+        gc.collect()
+        _try_gpu_cleanup()
         logger.error(
             "Error for %s shape=%s dtype=%s: %s",
             config.backend, config.shape, config.dtype, e,

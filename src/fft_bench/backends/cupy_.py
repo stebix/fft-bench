@@ -66,10 +66,12 @@ class CuPyBackend:
         cp.cuda.Stream.null.synchronize()
 
     def teardown(self) -> None:
-        """Release GPU arrays."""
+        """Release GPU arrays and free cached memory."""
         self._data = None
         self._fft_func = None
         cp.get_default_memory_pool().free_all_blocks()
+        cp.get_default_pinned_memory_pool().free_all_blocks()
+        cp.fft.config.get_plan_cache().clear()
 
 
 def _generate_input(shape: tuple[int, ...], dtype: str) -> np.ndarray:
